@@ -1,13 +1,14 @@
-import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { authenticateUser, initializeStorage, setCurrentUser } from "../../services/storage";
+import API from "../../api";
+import { setSession } from "../../services/session";
 import StatusBanner from "../../components/StatusBanner";
 
 function generateCaptcha() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
   let code = "";
-  for (let i = 0; i < 6; i += 1) {
+  for (let index = 0; index < 6; index += 1) {
     code += chars[Math.floor(Math.random() * chars.length)];
   }
   return code;
@@ -15,37 +16,22 @@ function generateCaptcha() {
 
 export default function Login() {
   const navigate = useNavigate();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("user");
+  const [role, setRole] = useState("student");
   const [remember, setRemember] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [captcha, setCaptcha] = useState(() => generateCaptcha());
   const [captchaInput, setCaptchaInput] = useState("");
   const [statusBanner, setStatusBanner] = useState({ type: "", msg: "" });
 
-  const normalizeLoginRole = (roleValue) => {
-    if (roleValue === "admin") {
-      return "admin";
-    }
-
-    if (roleValue === "student" || roleValue === "user") {
-      return "user";
-    }
-
-    return "user";
-  };
-
   const refreshCaptcha = () => {
     setCaptcha(generateCaptcha());
     setCaptchaInput("");
   };
 
-  const handleLogin = (e) => {
-    e.preventDefault();
-
-    initializeStorage();
+  const handleLogin = async (event) => {
+    event.preventDefault();
 
     if (captchaInput.trim() !== captcha) {
       setStatusBanner({ type: "error", msg: "Captcha verification failed. Please try again." });
@@ -54,152 +40,148 @@ export default function Login() {
       return;
     }
 
-    const matchedUser = authenticateUser(email, password);
+    try {
+      const response = await API.post("/auth/login", {
+        email: email.trim(),
+        password,
+      });
+      console.log(response.data);
+      const matchedUser = response.data?.user ?? response.data;
 
-    if (!matchedUser) {
-      setStatusBanner({ type: "error", msg: "Invalid email or password." });
-      toast.error("Invalid email or password.");
-      return;
+      if (!matchedUser) {
+        throw new Error("Invalid login response.");
+      }
+
+      if (matchedUser.status === "Blocked") {
+        setStatusBanner({ type: "error", msg: "Your account is currently blocked by admin." });
+        toast.error("Your account is currently blocked by admin.");
+        return;
+      }
+
+      if (matchedUser.role !== role) {
+        setStatusBanner({ type: "error", msg: `This account is registered as ${matchedUser.role}.` });
+        toast.error(`This account is registered as ${matchedUser.role}.`);
+        return;
+      }
+
+      setSession({ ...matchedUser, remember });
+      toast.success("Login successful.");
+      navigate(matchedUser.role === "admin" ? "/admin/dashboard" : "/user/dashboard");
+    } catch (error) {
+      const message = error.response?.data?.message || "Invalid email or password.";
+      setStatusBanner({ type: "error", msg: message });
+      toast.error(message);
     }
-
-    if (matchedUser.status === "Blocked") {
-      setStatusBanner({ type: "error", msg: "Your account is blocked by admin." });
-      toast.error("Your account is blocked by admin.");
-      return;
-    }
-
-    const selectedRole = normalizeLoginRole(role);
-    const accountRole = normalizeLoginRole(matchedUser.role);
-
-    if (selectedRole !== accountRole) {
-      setStatusBanner({ type: "error", msg: `This account is registered as ${accountRole}. Please select ${accountRole}.` });
-      toast.error(`This account is registered as ${accountRole}. Please select ${accountRole}.`);
-      return;
-    }
-
-    localStorage.setItem("isLoggedIn", "true");
-    localStorage.setItem("role", matchedUser.role);
-    localStorage.setItem("rememberUser", String(remember));
-    setCurrentUser(matchedUser);
-    setStatusBanner({ type: "success", msg: "Login successful!" });
-    toast.success("Login successful!");
-    navigate(matchedUser.role === "admin" ? "/admin/dashboard" : "/user/dashboard");
   };
 
   return (
-    <div className="loginPage">
-      <form className="loginCard" onSubmit={handleLogin}>
-        <div className="loginHeader">
-          <h2>Login</h2>
-          <p>Log in to your account to continue</p>
-        </div>
+    <div className="auth-page">
+      <div className="auth-shell">
+        <section className="auth-content-panel">
+          <span className="eyebrow">Institution access</span>
+          <h1>Sign in to continue your registration workflow</h1>
+          <p>
+            Use your institutional account to review schedules, submit course requests, approve
+            registrations, and manage conflict resolution.
+          </p>
 
-        <StatusBanner type={statusBanner.type} msg={statusBanner.msg} />
+          <div className="auth-side-list">
+            <div>
+              <strong>Why sign in?</strong>
+              <p>Access student dashboards, approval queues, and role-based schedule tools.</p>
+            </div>
+            <div>
+              <strong>Password requirements</strong>
+              <p>Use at least 8 characters and keep your campus credentials private.</p>
+            </div>
+            <div>
+              <strong>Support and privacy</strong>
+              <p>Need help? Contact your department office. Session data stays within this local workflow.</p>
+            </div>
+            <div>
+              <strong>Admin access</strong>
+              <p>Select the admin role only if your account has been created for academic operations.</p>
+            </div>
+          </div>
+        </section>
 
-        <div className="inputGroup">
-          <label htmlFor="login-email">Email Address</label>
-          <input
-            id="login-email"
-            type="email"
-            aria-label="Email address"
-            placeholder="name@university.edu"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </div>
-
-        <div className="inputGroup">
-          <div className="passwordRow">
-            <label htmlFor="login-password">Password</label>
-            <span className="forgot" role="button" tabIndex={0}>Forgot Password?</span>
+        <form className="auth-card" onSubmit={handleLogin}>
+          <div className="loginHeader">
+            <h2>Login</h2>
+            <p>Use your student or admin account to enter CourseFlow.</p>
           </div>
 
-          <div className="passwordWrap">
+          <StatusBanner type={statusBanner.type} msg={statusBanner.msg} />
+
+          <div className="inputGroup">
+            <label htmlFor="login-email">Email address</label>
             <input
-              id="login-password"
-              type={showPass ? "text" : "password"}
-              aria-label="Password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              id="login-email"
+              type="email"
+              placeholder="name@campus.edu"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
             />
-            <span
-              className="eyeIcon"
-              role="button"
-              tabIndex={0}
-              aria-label={showPass ? "Hide password" : "Show password"}
-              onClick={() => setShowPass(!showPass)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  setShowPass(!showPass);
-                }
-              }}
-            >
-              👁
-            </span>
           </div>
-        </div>
 
-        <div className="inputGroup">
-          <label htmlFor="login-role">Role</label>
-          <select
-            id="login-role"
-            aria-label="Login role"
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-          >
-            <option value="user">User</option>
-            <option value="admin">Admin</option>
-          </select>
-        </div>
+          <div className="inputGroup">
+            <label htmlFor="login-password">Password</label>
+            <div className="passwordWrap">
+              <input
+                id="login-password"
+                type={showPass ? "text" : "password"}
+                placeholder="Enter your password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+              <button type="button" className="password-toggle" onClick={() => setShowPass((previous) => !previous)}>
+                {showPass ? "Hide" : "Show"}
+              </button>
+            </div>
+          </div>
 
-        <label className="rememberRow">
-          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-          <span>Remember me for 30 days</span>
-        </label>
+          <div className="inputGroup">
+            <label htmlFor="login-role">Access role</label>
+            <select id="login-role" value={role} onChange={(event) => setRole(event.target.value)}>
+              <option value="student">Student</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
 
-        <div className="inputGroup">
-          <label htmlFor="captcha-input">Captcha</label>
-          <div className="captchaRow">
-            <span className="captchaPrompt" aria-live="polite">
-              {captcha}
-            </span>
-            <button type="button" className="captchaRefresh" onClick={refreshCaptcha} aria-label="Refresh captcha">
-              Refresh
+          <label className="rememberRow">
+            <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+            <span>Remember this session on this device</span>
+          </label>
+
+          <div className="inputGroup">
+            <label htmlFor="captcha-input">Security check</label>
+            <div className="captchaRow">
+              <span className="captchaPrompt" aria-live="polite">
+                {captcha}
+              </span>
+              <button type="button" className="captchaRefresh" onClick={refreshCaptcha}>
+                Refresh
+              </button>
+            </div>
+            <input
+              id="captcha-input"
+              type="text"
+              placeholder="Enter the code shown above"
+              value={captchaInput}
+              onChange={(event) => setCaptchaInput(event.target.value)}
+            />
+          </div>
+
+          <button className="btn-primary fullBtn">Sign in</button>
+
+          <p className="auth-switch-copy">
+            Need an account?
+            <button type="button" className="link-button" onClick={() => navigate("/signup")}>
+              Create one here
             </button>
-          </div>
-          <input
-            id="captcha-input"
-            type="text"
-            aria-label="Captcha answer"
-            placeholder="Enter captcha result"
-            value={captchaInput}
-            onChange={(e) => setCaptchaInput(e.target.value)}
-          />
-        </div>
-
-        <button className="btn-primary fullBtn" aria-label="Sign in">
-          Sign In →
-        </button>
-
-        <p style={{ marginTop: "10px", textAlign: "center" }}>
-          Don't have account?{" "}
-          <span
-            role="button"
-            tabIndex={0}
-            aria-label="Go to signup"
-            style={{ color: "var(--color-primary)", cursor: "pointer" }}
-            onClick={() => navigate("/signup")}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                navigate("/signup");
-              }
-            }}
-          >
-            Sign Up
-          </span>
-        </p>
-      </form>
+          </p>
+        </form>
+      </div>
     </div>
   );
 }

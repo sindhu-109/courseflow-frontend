@@ -1,107 +1,156 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AlertTriangle, ArrowRightCircle, CheckCircle2, Users } from "lucide-react";
+import toast from "react-hot-toast";
 import AdminLayout from "../../layout/AdminLayout";
-import {
-	getScheduleConflicts,
-	getRegistrationsWithDetails,
-	initializeStorage,
-} from "../../services/storage";
+import API from "../../api";
+import { normalizeRegistration } from "../../services/adapters";
+import { getScheduleConflicts } from "../../utils/schedule";
 
 const RESOLVED_CONFLICTS_KEY = "resolvedConflicts";
 
 export default function ConflictResolver() {
-	const navigate = useNavigate();
-	const [registrations, setRegistrations] = useState([]);
-	const [resolvedConflictIds, setResolvedConflictIds] = useState(() => {
-		try {
-			return JSON.parse(localStorage.getItem(RESOLVED_CONFLICTS_KEY) || "[]");
-		} catch {
-			return [];
-		}
-	});
+  const navigate = useNavigate();
+  const [registrations, setRegistrations] = useState([]);
+  const [resolvedConflictIds, setResolvedConflictIds] = useState(() => {
+    try {
+      return JSON.parse(window.sessionStorage.getItem(RESOLVED_CONFLICTS_KEY) || "[]");
+    } catch {
+      return [];
+    }
+  });
 
-	const conflicts = useMemo(() => {
-		return getScheduleConflicts(registrations).map((conflict) => ({
-			...conflict,
-			autoSuggestion: `Adjust timing for one of: ${conflict.courseNames.join(", ")} or reject one registration.`,
-			resolved: resolvedConflictIds.includes(conflict.id),
-		}));
-	}, [registrations, resolvedConflictIds]);
+  useEffect(() => {
+    const loadRegistrations = async () => {
+      try {
+        const response = await API.get("/registrations");
+        setRegistrations(
+          Array.isArray(response.data) ? response.data.map(normalizeRegistration) : []
+        );
+      } catch {
+        toast.error("Unable to load conflict data.");
+      }
+    };
 
-	const resolveConflict = (conflictId) => {
-		if (resolvedConflictIds.includes(conflictId)) {
-			return;
-		}
+    loadRegistrations();
+  }, []);
 
-		const updatedResolvedIds = [...resolvedConflictIds, conflictId];
-		setResolvedConflictIds(updatedResolvedIds);
-		localStorage.setItem(RESOLVED_CONFLICTS_KEY, JSON.stringify(updatedResolvedIds));
-	};
+  const conflicts = useMemo(
+    () =>
+      getScheduleConflicts(registrations).map((conflict) => ({
+        ...conflict,
+        resolved: resolvedConflictIds.includes(conflict.id),
+      })),
+    [registrations, resolvedConflictIds]
+  );
 
-	useEffect(() => {
-		initializeStorage();
-		setRegistrations(getRegistrationsWithDetails());
-	}, []);
+  const activeConflictCount = conflicts.filter((conflict) => !conflict.resolved).length;
 
-	const activeConflictCount = conflicts.filter((conflict) => !conflict.resolved).length;
+  const markResolved = (conflictId) => {
+    if (resolvedConflictIds.includes(conflictId)) {
+      return;
+    }
 
-	const handleEditCourse = (courseId) => {
-		navigate(`/admin/manage-courses?editCourseId=${courseId}`);
-	};
+    const nextResolvedIds = [...resolvedConflictIds, conflictId];
+    setResolvedConflictIds(nextResolvedIds);
+    window.sessionStorage.setItem(RESOLVED_CONFLICTS_KEY, JSON.stringify(nextResolvedIds));
+  };
 
-	return (
-		<AdminLayout>
-			<h1>Conflict Resolver</h1>
+  return (
+    <AdminLayout>
+      <div className="dashboard-shell">
+        <section className="page-hero compact-hero">
+          <div>
+            <span className="eyebrow">Conflict center</span>
+            <h1>Review overlaps with severity and suggested replacement paths</h1>
+            <p>
+              Jump directly to the affected course records, understand impact, and leave the queue
+              with fewer schedule collisions.
+            </p>
+          </div>
+        </section>
 
-			<div style={{ marginTop: "16px" }}>
-				<h3>Time Conflict Alerts</h3>
-				<p style={{ marginTop: "6px", color: "var(--color-text-soft)" }}>
-					Active alerts: {activeConflictCount}
-				</p>
-			</div>
+        <section className="stats-row">
+          <article className="dashboard-stat-card alert-card">
+            <AlertTriangle size={18} />
+            <strong>{activeConflictCount}</strong>
+            <span>Active alerts</span>
+            <p>Approved schedules that still have unresolved overlaps.</p>
+          </article>
+          <article className="dashboard-stat-card success-card">
+            <CheckCircle2 size={18} />
+            <strong>{conflicts.filter((conflict) => conflict.resolved).length}</strong>
+            <span>Resolved</span>
+            <p>Conflicts already reviewed and marked complete in this workspace.</p>
+          </article>
+        </section>
 
-			<div style={{ marginTop: "14px", display: "grid", gap: "12px" }}>
-				{conflicts.length === 0 && (
-					<div className="card" style={{ padding: "14px" }}>
-						No course time conflicts found in approved registrations.
-					</div>
-				)}
-				{conflicts.map((conflict) => (
-					<div key={conflict.id} className="card" style={{ padding: "14px" }}>
-						<h4 style={{ margin: "0 0 8px 0" }}>
-							{conflict.student} → {conflict.message}
-						</h4>
-						<p style={{ margin: "0 0 6px 0", color: "var(--color-danger)" }}>
-							<strong>Time conflict alert:</strong> {conflict.timeAlert || "Time not set"}
-						</p>
-						<p style={{ margin: "0 0 10px 0", color: "var(--color-success)" }}>
-							<strong>Auto suggestion:</strong> {conflict.autoSuggestion}
-						</p>
+        <section className="stacked-cards">
+          {conflicts.length === 0 ? (
+            <div className="card-surface">No schedule conflicts were found in approved registrations.</div>
+          ) : (
+            conflicts.map((conflict) => (
+              <article key={conflict.id} className="registration-card card-surface">
+                <div className="course-header-row">
+                  <div>
+                    <div className="tag-row">
+                      <span className={`chip severity-chip severity-${conflict.severity.toLowerCase()}`}>
+                        {conflict.severity} severity
+                      </span>
+                      <span className="chip">{conflict.dayLabel}</span>
+                    </div>
+                    <h3>{conflict.student}</h3>
+                    <p className="course-description">{conflict.message}</p>
+                  </div>
+                  <span className={`status-pill ${conflict.resolved ? "success" : "danger"}`}>
+                    {conflict.resolved ? "Resolved" : "Needs action"}
+                  </span>
+                </div>
 
-						<button
-							onClick={() => resolveConflict(conflict.id)}
-							disabled={conflict.resolved}
-							className={conflict.resolved ? "btn-muted" : "btn-primary"}
-						>
-							{conflict.resolved ? "Resolved" : "Resolve"}
-						</button>
+                <div className="registration-timeline">
+                  <div>
+                    <span className="timeline-label">Overlap window</span>
+                    <strong>{conflict.timeAlert}</strong>
+                  </div>
+                  <div>
+                    <span className="timeline-label">Impacted students</span>
+                    <strong>{conflict.impactedStudentsCount}</strong>
+                  </div>
+                </div>
 
-						{conflict.resolved && (
-							<div style={{ marginTop: "10px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
-								{conflict.courseIds?.map((courseId, index) => (
-									<button
-										key={`${conflict.id}-${courseId}`}
-										onClick={() => handleEditCourse(courseId)}
-										className="btn-success"
-									>
-										Edit {conflict.courseNames?.[index] || `Course ${courseId}`}
-									</button>
-								))}
-							</div>
-						)}
-					</div>
-				))}
-			</div>
-		</AdminLayout>
-	);
+                <div className="preview-timeline">
+                  {conflict.replacementSuggestions.map((suggestion) => (
+                    <div key={suggestion} className="timeline-item alert-item">
+                      <Users size={14} />
+                      <p>{suggestion}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="button-row spaced-row">
+                  <button
+                    onClick={() => markResolved(conflict.id)}
+                    disabled={conflict.resolved}
+                    className={conflict.resolved ? "btn-muted" : "btn-primary"}
+                  >
+                    {conflict.resolved ? "Reviewed" : "Mark reviewed"}
+                  </button>
+
+                  {conflict.courseIds.map((courseId, index) => (
+                    <button
+                      key={`${conflict.id}-${courseId}`}
+                      onClick={() => navigate(`/admin/manage-courses?editCourseId=${courseId}`)}
+                      className="btn-success"
+                    >
+                      <ArrowRightCircle size={14} /> Open {conflict.courseCodes[index]}
+                    </button>
+                  ))}
+                </div>
+              </article>
+            ))
+          )}
+        </section>
+      </div>
+    </AdminLayout>
+  );
 }

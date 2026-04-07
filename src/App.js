@@ -11,14 +11,12 @@ import ManageCourses from "./pages/admin/ManageCourses";
 import ManageUsers from "./pages/admin/ManageUsers";
 import Registrations from "./pages/admin/Registrations";
 import ConflictResolver from "./pages/admin/ConflictResolver";
+import { isLoggedIn } from "./services/session";
 
 
 // ✅ ONLY ONE ProtectedRoute
 const ProtectedRoute = ({ children }) => {
-
-  const isLoggedIn = localStorage.getItem("isLoggedIn");
-
-  if (!isLoggedIn) {
+  if (!isLoggedIn()) {
     return <Navigate to="/login" />;
   }
 

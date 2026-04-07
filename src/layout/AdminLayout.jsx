@@ -1,7 +1,7 @@
 import { Suspense, lazy, useState } from "react";
 import { Menu } from "lucide-react";
 import Navbar from "../components/Navbar";
-import { getRole } from "../services/storage";
+import { getRole } from "../services/session";
 
 const Sidebar = lazy(() => import("../components/Sidebar"));
 
@@ -33,9 +33,7 @@ export default function AdminLayout({ children }) {
 
         <Navbar role="admin" />
 
-        <div className="page-container" style={{ padding: "30px" }}>
-          {children}
-        </div>
+        <div className="page-container">{children}</div>
       </div>
     </div>
   );

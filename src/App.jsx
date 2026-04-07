@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
-import { Suspense, lazy, useEffect } from "react";
+import { Suspense, lazy } from "react";
 import { Toaster } from "react-hot-toast";
-import { getRole, initializeStorage } from "./services/storage";
+import { getRole, isLoggedIn } from "./services/session";
 
 const Home = lazy(() => import("./pages/Home"));
 const Login = lazy(() => import("./pages/auth/Login"));
@@ -19,10 +19,9 @@ const Registrations = lazy(() => import("./pages/admin/Registrations"));
 const ConflictResolver = lazy(() => import("./pages/admin/ConflictResolver"));
 
 const RoleRoute = ({ roleNeeded, children }) => {
-  const isLoggedIn = localStorage.getItem("isLoggedIn");
   const role = getRole();
 
-  if (!isLoggedIn) {
+  if (!isLoggedIn()) {
     return <Navigate to="/login" replace />;
   }
 
@@ -34,10 +33,6 @@ const RoleRoute = ({ roleNeeded, children }) => {
 };
 
 function App() {
-  useEffect(() => {
-    initializeStorage();
-  }, []);
-
   return (
     <BrowserRouter>
       <Toaster position="top-right" />
