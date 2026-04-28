@@ -207,8 +207,8 @@ export default function ManageUsers() {
                   <div key={course.id} className="timeline-item">
                     <span className="timeline-dot" />
                     <div>
-                      <strong>{course.courseCode} · {course.courseName}</strong>
-                      <p>{course.courseTime} · {course.courseRoom}</p>
+                      <strong>{course.courseCode} | {course.courseName}</strong>
+                      <p>{course.courseTime} | {course.courseRoom}</p>
                     </div>
                   </div>
                 ))

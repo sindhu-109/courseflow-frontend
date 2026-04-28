@@ -156,7 +156,7 @@ export default function Home() {
               <div className="mock-dashboard-item">
                 <div>
                   <span className="mock-label">Next class</span>
-                  <strong>Data Structures · Monday 10:00 AM</strong>
+                  <strong>Data Structures | Monday 10:00 AM</strong>
                 </div>
                 <span className="status-pill info">Block A Room 204</span>
               </div>
@@ -262,7 +262,7 @@ export default function Home() {
       </main>
 
       <footer className="landing-footer">
-        <p>CourseFlow © 2026</p>
+        <p>CourseFlow | 2026</p>
         <div className="landing-footer-links">
           <Link to="/">About</Link>
           <Link to="/login">Support</Link>

@@ -1,14 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  BookOpen,
-  CalendarRange,
-  Search,
-  UserCircle2,
-  Users,
-} from "lucide-react";
 import toast from "react-hot-toast";
 import UserLayout from "../../layout/UserLayout";
+import CourseCatalogCard from "../../components/CourseCatalogCard";
+import CourseCatalogFilters from "../../components/CourseCatalogFilters";
 import EmptyState from "../../components/EmptyState";
 import SkeletonCard from "../../components/SkeletonCard";
 import API from "../../api";
@@ -201,58 +196,13 @@ export default function BrowseCourses() {
           </div>
         </section>
 
-        <section className="card-surface toolbar-surface filter-surface">
-          <div className="toolbar-title">
-            <Search size={16} />
-            <span>Search and refine the catalog</span>
-          </div>
-
-          <input
-            type="text"
-            placeholder="Search by title, code, faculty, prerequisite, or department"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            className="page-search"
-          />
-
-          <div className="filter-grid">
-            <select value={filters.department} onChange={(event) => handleFilterChange("department", event.target.value)}>
-              {filterOptions.departments.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-            <select value={filters.faculty} onChange={(event) => handleFilterChange("faculty", event.target.value)}>
-              {filterOptions.faculty.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-            <select value={filters.day} onChange={(event) => handleFilterChange("day", event.target.value)}>
-              {filterOptions.days.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-            <select value={filters.timeSlot} onChange={(event) => handleFilterChange("timeSlot", event.target.value)}>
-              {filterOptions.timeSlots.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-            <select value={filters.availability} onChange={(event) => handleFilterChange("availability", event.target.value)}>
-              {filterOptions.availability.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </div>
-        </section>
+        <CourseCatalogFilters
+          filterOptions={filterOptions}
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onSearchChange={setSearchText}
+          searchText={searchText}
+        />
 
         {courses.length === 0 ? (
           <EmptyState
@@ -267,74 +217,14 @@ export default function BrowseCourses() {
                 desc="Try clearing a filter or searching with a broader keyword."
               />
             ) : (
-              filteredCourses.map((course) => {
-                const registrationStatus = registrationByCourseId[course.id];
-                const isDisabled = registrationStatus === "Pending" || registrationStatus === "Approved";
-                const buttonText =
-                  registrationStatus === "Approved"
-                    ? "Approved"
-                    : registrationStatus === "Pending"
-                      ? "Pending approval"
-                      : "Request seat";
-
-                return (
-                  <article key={course.id} className="course-showcase-card">
-                    <div className="course-header-row">
-                      <div>
-                        <div className="tag-row">
-                          <span className="chip chip-core">{course.courseCode}</span>
-                          <span className="chip">{course.department}</span>
-                          <span className="chip">{course.credits} credits</span>
-                          <span className="chip">{course.semester}</span>
-                        </div>
-                        <h3>{course.courseName}</h3>
-                      </div>
-                      <span className={`status-pill ${course.availableSeats <= 5 ? "warning" : "success"}`}>
-                        {course.availableSeats} seats open
-                      </span>
-                    </div>
-
-                    <p className="course-description">{course.description}</p>
-
-                    <div className="course-meta-grid">
-                      <p>
-                        <BookOpen size={14} /> {course.day} · {course.timeSlot}
-                      </p>
-                      <p>
-                        <CalendarRange size={14} /> {course.mode} · {course.room}
-                      </p>
-                      <p>
-                        <Users size={14} /> Capacity {course.capacity} · Enrolled {course.enrolledCount}
-                      </p>
-                      <p>
-                        <UserCircle2 size={14} /> {course.faculty}
-                      </p>
-                    </div>
-
-                    <div className="faculty-snippet">
-                      <strong>Faculty profile</strong>
-                      <p>{course.facultyProfile}</p>
-                    </div>
-
-                    <div className="course-footer-row course-footer-stacked">
-                      <div className="subtle-stack">
-                        <span>Prerequisites: {course.prerequisites}</span>
-                        {registrationStatus === "Rejected" ? (
-                          <span>Your previous request was rejected. You can submit again.</span>
-                        ) : null}
-                      </div>
-
-                      <button
-                        onClick={() => handleEnroll(course.id)}
-                        disabled={isDisabled}
-                        className={isDisabled ? "btn-muted" : "btn-primary"}
-                      >
-                        {buttonText}
-                      </button>
-                    </div>
-                  </article>
-                );
-              })
+              filteredCourses.map((course) => (
+                <CourseCatalogCard
+                  key={course.id}
+                  course={course}
+                  onEnroll={handleEnroll}
+                  registrationStatus={registrationByCourseId[course.id]}
+                />
+              ))
             )}
           </div>
         )}

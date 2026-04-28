@@ -97,7 +97,7 @@ export default function UserDashboard() {
     () =>
       registrations.slice(0, 4).map((registration) => ({
         id: registration.id,
-        title: `${registration.courseCode} · ${registration.courseName}`,
+        title: `${registration.courseCode} | ${registration.courseName}`,
         detail:
           registration.status === "Pending"
             ? "Request submitted and waiting for approval."

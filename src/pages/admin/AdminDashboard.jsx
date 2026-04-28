@@ -92,11 +92,11 @@ export default function AdminDashboard() {
     () =>
       registrations.slice(0, 5).map((registration) => ({
         id: registration.id,
-        title: `${registration.student} · ${registration.courseCode}`,
+        title: `${registration.student} | ${registration.courseCode}`,
         detail:
           registration.status === "Pending"
             ? `Requested ${registration.courseName} and is waiting for review.`
-            : `${registration.status} · ${registration.decisionNote || "Decision recorded."}`,
+            : `${registration.status} | ${registration.decisionNote || "Decision recorded."}`,
       })),
     [registrations]
   );
@@ -193,7 +193,7 @@ export default function AdminDashboard() {
                   <div key={request.id} className="mini-list-item">
                     <div>
                       <strong>{request.student}</strong>
-                      <span>{request.courseCode} · {request.courseName}</span>
+                      <span>{request.courseCode} | {request.courseName}</span>
                     </div>
                     <span className="status-pill warning">
                       {new Date(request.createdAt).toLocaleDateString()}
